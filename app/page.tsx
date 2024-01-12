@@ -1,11 +1,13 @@
 'use client';
 
 import { useToSvg } from '@hugocxl/react-to-image';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import ImageUploading, { ImageListType } from 'react-images-uploading';
 
 export default function Home() {
   const [images, setImages] = useState([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const onChange = (imageList: ImageListType) => {
     setImages(imageList as never[]);
@@ -25,8 +27,61 @@ export default function Home() {
     },
   });
 
+  const handleTakePhoto = () => {
+    if (isRecording) {
+      if (!videoRef.current) return;
+      // get current frame as image
+      const canvas = document.createElement('canvas');
+
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      canvas
+        .getContext('2d')
+        ?.drawImage(
+          videoRef.current,
+          0,
+          0,
+          videoRef.current.videoWidth,
+          videoRef.current.videoHeight
+        );
+
+      const dataUrl = canvas.toDataURL('image/png');
+
+      // imagelisttype
+      const imageList = [
+        {
+          dataURL: dataUrl,
+          file: new File([dataUrl], 'image.png', { type: 'image/png' }),
+        },
+      ];
+
+      setImages(imageList as never[]);
+
+      setIsRecording(false);
+
+      return;
+    }
+
+    setIsRecording(true);
+
+    navigator.mediaDevices
+      .getUserMedia({
+        video: {
+          facingMode: 'user',
+        },
+      })
+      .then(stream => {
+        if (!videoRef.current) return;
+
+        videoRef.current.srcObject = stream;
+      })
+      .catch(error => {
+        console.error('Error accessing media devices.', error);
+      });
+  };
+
   return (
-    <main className="flex h-screen w-screen items-center justify-center">
+    <main className="flex h-screen w-screen items-center justify-center p-4">
       <div className="flex h-full w-full max-w-xl items-center">
         <div ref={ref} className="relative w-full">
           <img src="/device.jpg" alt="device" className="object-cover" />
@@ -49,6 +104,13 @@ export default function Home() {
                     <span className="absolute">+</span>
                   )}
 
+                  {isRecording && (
+                    <video
+                      autoPlay
+                      ref={videoRef}
+                      className="z-[50] h-full w-full rounded-[2rem] object-cover"
+                    ></video>
+                  )}
                   {imageList.map((img, idx) => (
                     <img
                       className="z-[50] h-full w-full rounded-[2rem] object-cover"
@@ -61,6 +123,12 @@ export default function Home() {
               </div>
             )}
           </ImageUploading>
+
+          <button
+            disabled={images.length > 0}
+            onClick={handleTakePhoto}
+            className="absolute right-[6.3%] top-[4.9%] h-1/6 w-1/6 rounded-2xl"
+          ></button>
         </div>
       </div>
 
